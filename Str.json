@@ -2,10 +2,10 @@
   "sourceName": "StreamingUnity",
   "iconUrl": "https://virginiapertutte.it/templates/sub-ita/images/logo.png",
   "author": {
-    "name": "sobet",
+    "name": "Manu",
     "icon": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRQPQ1qIiALbM3xDWGsuJzu6ItaQGwb9ICRRw&s"
   },
-  "version": "9000000.0.1",
+  "version": "1",
   "language": "Italian",
   "streamType": "HLS",
   "quality": "1080p",
