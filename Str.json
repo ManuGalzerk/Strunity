@@ -11,7 +11,7 @@
   "quality": "1080p",
   "baseUrl": "https://streamingunity.tv/it",
   "searchBaseUrl": "https://streamingunity.tv/it/archive?title=%s",
-  "scriptUrl": "https://git.luna-app.eu/50n50/sources/raw/branch/main/streamingunity/streamingunity.js",
+  "scriptUrl": "https://raw.githubusercontent.com/ManuGalzerk/Strunity/refs/heads/main/str.js",
   "asyncJS": true,
   "type": "shows/movies",
   "supportsSora": true,
