@@ -3,7 +3,7 @@ const SOURCE = {
   name: "AnimeSaturn",
   baseUrl: "https://www.animesaturn.cx",
   language: "it",
-  version: "1.0.0",
+  version: "2.0.0",
   iconUrl: "https://www.animesaturn.cx/favicon.ico",
   contentKind: "anime"
 };
