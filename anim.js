@@ -8,51 +8,57 @@ const SOURCE = {
   contentKind: "anime"
 };
 
+const ANIME_CARD_REGEX = /<a href="(https:\/\/www\.animesaturn\.cx\/anime\/[^"]+)"[^>]*class="thumb image-wrapper">\s*<img src="(https:\/\/cdn\.animesaturn\.cx\/static\/images\/copertine\/[^"]+)"[^>]*alt="([^"]+)"/g;
+
+function parseAnimeCards(html) {
+  const results = [];
+  const seen = new Set();
+  let match;
+  ANIME_CARD_REGEX.lastIndex = 0;
+  while ((match = ANIME_CARD_REGEX.exec(html)) !== null) {
+    const id = match[1].trim();
+    if (seen.has(id)) continue;
+    seen.add(id);
+    results.push({
+      id,
+      title: match[3].trim(),
+      imageUrl: match[2].trim(),
+      type: "video"
+    });
+  }
+  return results;
+}
+
 async function fetchPopular(page) {
-  return [];
+  const response = await fetchv2(`${SOURCE.baseUrl}/top-anime`);
+  const html = await response.text();
+  return parseAnimeCards(html);
 }
 
 async function fetchLatest(page) {
-  return [];
+  const response = await fetchv2(`${SOURCE.baseUrl}/`);
+  const html = await response.text();
+  return parseAnimeCards(html);
 }
 
 async function fetchSearch(query, page, filters) {
   const response = await fetchv2(`${SOURCE.baseUrl}/animelist?search=${encodeURIComponent(query)}`);
   const html = await response.text();
-
-  const results = [];
-  const regex = /<a href="(https:\/\/www\.animesaturn\.cx\/anime\/[^"]+)"[^>]*class="thumb image-wrapper">\s*<img src="(https:\/\/cdn\.animesaturn\.cx\/static\/images\/copertine\/[^"]+)"[^>]*alt="([^"]+)"/g;
-
-  let match;
-  while ((match = regex.exec(html)) !== null) {
-    results.push({
-      id: match[1].trim(),
-      title: match[3].trim(),
-      imageUrl: match[2].trim()
-    });
-  }
-
-  return results;
+  return parseAnimeCards(html);
 }
 
 async function fetchItemDetails(id) {
   const response = await fetchv2(id);
   const html = await response.text();
 
-  const descriptionRegex = /<div id="shown-trama">([^<]+)<\/div>/;
-  const descriptionMatch = html.match(descriptionRegex);
-  const description = descriptionMatch ? descriptionMatch[1].trim() : "";
-
-  const titleRegex = /<b[^>]*>\s*([^<]+?)\s*<\/b>/;
-  const titleMatch = html.match(titleRegex);
-
-  const imageRegex = /<img[^>]+src="(https:\/\/cdn\.animesaturn\.cx\/static\/images\/copertine\/[^"]+)"/;
-  const imageMatch = html.match(imageRegex);
+  const descriptionMatch = html.match(/<div id="shown-trama">([^<]+)<\/div>/);
+  const titleMatch = html.match(/<b[^>]*>\s*([^<]+?)\s*<\/b>/);
+  const imageMatch = html.match(/<img[^>]+src="(https:\/\/cdn\.animesaturn\.cx\/static\/images\/copertine\/[^"]+)"/);
 
   return {
     id,
     title: titleMatch ? titleMatch[1].trim() : "",
-    description,
+    description: descriptionMatch ? descriptionMatch[1].trim() : "",
     imageUrl: imageMatch ? imageMatch[1].trim() : "",
     genres: [],
     status: "unknown",
@@ -80,31 +86,4 @@ async function fetchChildren(itemId) {
   return results;
 }
 
-async function fetchVideoList(itemId, childId) {
-  const response = await fetchv2(childId);
-  const html = await response.text();
-
-  const streamUrlRegex = /<a href="(https:\/\/www\.animesaturn\.cx\/watch\?file=[^"]+)"/;
-  const match = html.match(streamUrlRegex);
-  if (!match) return [];
-
-  const redirect = match[1];
-  const responseTwo = await fetchv2(redirect);
-  const htmlTwo = await responseTwo.text();
-
-  const hlsUrlRegex = /file:\s*"(https:\/\/[^"]+\.m3u8)"/;
-  const hlsMatch = htmlTwo.match(hlsUrlRegex);
-  if (hlsMatch) {
-    const url = hlsMatch[1].trim();
-    return [{ url, quality: "default", originalUrl: url }];
-  }
-
-  const mp4UrlRegex = /<source[^>]+src="(https:\/\/[^">]+\.mp4)"/;
-  const mp4Match = htmlTwo.match(mp4UrlRegex);
-  if (mp4Match) {
-    const url = mp4Match[1].trim();
-    return [{ url, quality: "default", originalUrl: url }];
-  }
-
-  return [];
-}
+async function fetchVideoList(itemId, c
