@@ -3,12 +3,15 @@ const source = {
   name: "AnimeSaturn",
   baseUrl: "https://www.animesaturn.cx",
   language: "it",
-  version: "2.0.1",
+  version: "3.0.0",
   iconUrl: "https://www.animesaturn.cx/favicon.ico",
   contentKind: "anime"
 };
 
 const SOURCE = source;
+
+// Fallback: usa fetchv2 se esiste, altrimenti fetch standard
+const _fetch = typeof fetchv2 !== "undefined" ? fetchv2 : fetch;
 
 const ANIME_CARD_REGEX = /<a href="(https:\/\/www\.animesaturn\.cx\/anime\/[^"]+)"[^>]*class="thumb image-wrapper">\s*<img src="(https:\/\/cdn\.animesaturn\.cx\/static\/images\/copertine\/[^"]+)"[^>]*alt="([^"]+)"/g;
 
@@ -32,25 +35,25 @@ function parseAnimeCards(html) {
 }
 
 async function fetchPopular(page) {
-  const response = await fetchv2(`${source.baseUrl}/top-anime`);
+  const response = await _fetch(`${source.baseUrl}/top-anime`);
   const html = await response.text();
   return parseAnimeCards(html);
 }
 
 async function fetchLatest(page) {
-  const response = await fetchv2(`${source.baseUrl}/`);
+  const response = await _fetch(`${source.baseUrl}/`);
   const html = await response.text();
   return parseAnimeCards(html);
 }
 
 async function fetchSearch(query, page, filters) {
-  const response = await fetchv2(`${source.baseUrl}/animelist?search=${encodeURIComponent(query)}`);
+  const response = await _fetch(`${source.baseUrl}/animelist?search=${encodeURIComponent(query)}`);
   const html = await response.text();
   return parseAnimeCards(html);
 }
 
 async function fetchItemDetails(id) {
-  const response = await fetchv2(id);
+  const response = await _fetch(id);
   const html = await response.text();
 
   const descriptionMatch = html.match(/<div id="shown-trama">([^<]+)<\/div>/);
@@ -69,7 +72,7 @@ async function fetchItemDetails(id) {
 }
 
 async function fetchChildren(itemId) {
-  const response = await fetchv2(itemId);
+  const response = await _fetch(itemId);
   const html = await response.text();
 
   const results = [];
@@ -89,13 +92,13 @@ async function fetchChildren(itemId) {
 }
 
 async function fetchVideoList(itemId, childId) {
-  const response = await fetchv2(childId);
+  const response = await _fetch(childId);
   const html = await response.text();
 
   const match = html.match(/<a href="(https:\/\/www\.animesaturn\.cx\/watch\?file=[^"]+)"/);
   if (!match) return [];
 
-  const responseTwo = await fetchv2(match[1]);
+  const responseTwo = await _fetch(match[1]);
   const htmlTwo = await responseTwo.text();
 
   const hlsMatch = htmlTwo.match(/file:\s*"(https:\/\/[^"]+\.m3u8)"/);
