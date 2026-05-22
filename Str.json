@@ -11,7 +11,7 @@
   "quality": "1080p",
   "baseUrl": "https://streamingunity.dog/it",
   "searchBaseUrl": "https://streamingunity.dog/it/archive?title=%s",
-  "scriptUrl": "https://raw.githubusercontent.com/ManuGalzerk/Strunity/refs/heads/main/str.js",
+  "scriptUrl": "raw.githubusercontent.com/ManuGalzerk/Strunity/refs/heads/main/str.js",
   "asyncJS": true,
   "type": "shows/movies",
   "supportsSora": true,
