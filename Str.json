@@ -1,20 +1,22 @@
 {
   "sourceName": "StreamingUnity",
-  "iconUrl": "https://virginiapertutte.it/templates/sub-ita/images/logo.png",
+  "iconUrl": "https://play-lh.googleusercontent.com/-BHc2mPj6oRWk0cjwMn5oYSd7rYl5RW1xn8BWdizIHBuh4cBQ6ev_EsxmA4Trt0o2jQ",
   "author": {
     "name": "Manu",
     "icon": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRQPQ1qIiALbM3xDWGsuJzu6ItaQGwb9ICRRw&s"
   },
-  "version": "1",
+  "version": "9000004",
   "language": "Italian",
   "streamType": "HLS",
   "quality": "1080p",
-  "baseUrl": "https://streamingunity.tv/it",
-  "searchBaseUrl": "https://streamingunity.tv/it/archive?title=%s",
-  "scriptUrl": "https://raw.githubusercontent.com/ManuGalzerk/Strunity/refs/heads/main/str.js",
+  "baseUrl": "https://streamingunity.bio/it",
+  "searchBaseUrl": "https://streamingunity.bio/it/archive?title=%s",
+  "scriptUrl": "https://git.luna-app.eu/50n50/sources/raw/branch/main/streamingunity/streamingunity.js",
   "asyncJS": true,
   "type": "shows/movies",
   "supportsSora": true,
   "supportsLuna": true,
-  "downloadSupport": false
+  "downloadSupport": false,
+  "supportsTsumi": true,
+  "supportsHiyoku": true
 }
