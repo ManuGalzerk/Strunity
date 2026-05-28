@@ -10,7 +10,7 @@
   "streamType": "MP4",
   "quality": "1080p",
   "baseUrl": "https://www.animesaturn.cx/",
-  "searchBaseUrl": "https://www.animesaturn.cx/animelist/search=%s",
+  "searchBaseUrl": "https://www.animesaturn.cx/animelist?search=%s",
   "scriptUrl": "https://raw.githubusercontent.com/ManuGalzerk/Strunity/refs/heads/main/anim.js",
   "type": "anime",
   "asyncJS": true,
