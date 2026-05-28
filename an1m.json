@@ -11,7 +11,7 @@
   "quality": "1080p",
   "baseUrl": "https://www.animesaturn.cx/",
   "searchBaseUrl": "https://www.animesaturn.cx/animelist?search=%s",
-  "scriptUrl": "https://raw.githubusercontent.com/ManuGalzerk/Strunity/refs/heads/main/anim.js",
+  "scriptUrl": "https://raw.githubusercontent.com/ManuGalzerk/Strunity/refs/heads/main/an1m.js",
   "type": "anime",
   "asyncJS": true,
   "supportsMojuru": true,
