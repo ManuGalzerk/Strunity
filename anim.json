@@ -5,18 +5,22 @@
     "name": "Manu",
     "icon": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRQPQ1qIiALbM3xDWGsuJzu6ItaQGwb9ICRRw&s"
   },
-  "version": "9000004",
+  "version": "5.0",
   "language": "Italian",
-  "streamType": "HLS",
+  "streamType": "MP4",
   "quality": "1080p",
   "baseUrl": "https://www.animesaturn.cx/",
   "searchBaseUrl": "https://www.animesaturn.cx/animelist/search=%s",
   "scriptUrl": "https://raw.githubusercontent.com/ManuGalzerk/Strunity/refs/heads/main/anim.js",
-  "asyncJS": true,
   "type": "anime",
+  "asyncJS": true,
+  "supportsMojuru": true,
+  "supportsDartotsu": true,
   "supportsSora": true,
   "supportsLuna": true,
   "downloadSupport": false,
+  "supportsAnymex": true,
   "supportsTsumi": true,
-  "supportsHiyoku": true
+  "supportsHiyoku": true,
+  "supportsShirox": true
 }
