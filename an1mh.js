@@ -16,18 +16,17 @@
       }
     }
   }
-
-  // FIX 1: rimosso class="thumb image-wrapper" (non esiste sul sito)
-  // FIX 2: CDN cambiato da hentaisaturn.cx a hentaisaturn.tv
-  const ANIME_CARD_REGEX = /<a 
-  href="(https:\/\/www\.hentaisaturn\.tv\/hentai\/[^"]+)"[^>]*>\s*<img[^>]+src="(https?:\/\/[^"]+)"[^>]*alt="([^"]+)"/g;
+  
+  // FIX: rimossa class="thumb image-wrapper" + CDN corretto da .cx a .tv
+  const ANIME_CARD_REGEX = /<a href="(https:\/\/www\.hentaisaturn\.tv\/hentai\/[^"]+)"[^>]*>\s*<img 
+  src="(https:\/\/[^"]+)"[^>]*alt="([^"]+)"/g;
 
   function parseAnimeCards(html) {
     const results = [];
     const seen = new Set();
     let match;
     ANIME_CARD_REGEX.lastIndex = 0;
-    while ((match = ANIME_CARD_REGEX.exec(html)) !== null) {                                          
+    while ((match = ANIME_CARD_REGEX.exec(html)) !== null) {
       const href = match[1].trim();
       if (seen.has(href)) continue;
       seen.add(href);
@@ -35,7 +34,7 @@
     }
     return results;
   }
-
+  
   async function searchResults(keyword) {
     try {
       const response = await soraFetch(`${BASE_URL}/hentailist?search=${encodeURIComponent(keyword)}`);
@@ -50,7 +49,6 @@
     try {
       const response = await soraFetch(url);
       const html = await response.text();
-      // FIX 3: [\s\S]*? per catturare contenuto multilinea, strip dei tag HTML interni
       const descriptionMatch = html.match(/<div[^>]+id="shown-trama"[^>]*>([\s\S]*?)<\/div>/i);
       const description = descriptionMatch
         ? descriptionMatch[1].replace(/<[^>]+>/g, "").trim()
@@ -96,7 +94,7 @@
     }
     return null;
   }
-
+  
   async function extractStreamUrl(url) {
     try {
       const epResponse = await soraFetch(url);
