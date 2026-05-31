@@ -1,9 +1,10 @@
 // HentaiSaturn - Sora module (asyncJS: true)
-// Entry points: searchResults, extractDetails, extractEpisodes, extractStreamUrl
-// extractStreamUrl returns a PLAIN URL STRING (or null).
- 
+// Strategy: HentaiSaturn's /hentailist?search= is broken (redirects unpredictably
+// to /hentailist or /hentailist?letter=...), so we bypass it. We fetch the letter
+// page corresponding to the first character of the keyword and filter client-side.
+
 const BASE_URL = "https://www.hentaisaturn.tv";
- 
+
 async function soraFetch(url, options = { headers: {}, method: "GET", body: null }) {
   try {
     return await fetchv2(url, options.headers ?? {}, options.method ?? "GET", options.body ?? null);
@@ -15,11 +16,10 @@ async function soraFetch(url, options = { headers: {}, method: "GET", body: null
     }
   }
 }
- 
-// Match any anchor pointing to /hentai/... that contains an <img> with a /locandine/ src.
-// Class names vary, so we don't hard-code them.
+
+// Match any anchor to /hentai/... containing an <img> with a /locandine/ src.
 const CARD_REGEX = /<a[^>]+href="(https?:\/\/www\.hentaisaturn\.tv\/hentai\/[^"]+)"[^>]*>[\s\S]*?<img[^>]+src="(https?:\/\/cdn\.hentaisaturn\.tv\/static\/images\/locandine\/[^"]+)"[^>]*\balt="([^"]+)"/g;
- 
+
 function parseAnimeCards(html) {
   const results = [];
   const seen = new Set();
@@ -33,61 +33,80 @@ function parseAnimeCards(html) {
   }
   return results;
 }
- 
-// Normalize a string for fuzzy comparison (lowercase, strip non-alphanumeric)
+
 function normalize(s) {
   return (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
 }
- 
-// Heuristic: a real search-results page contains the "Hai cercato ... hai trovato N risultati"
-// banner. A fallback (letter listing) does not. If the page IS a results page but the
-// reported count is suspicious (≥100) for a multi-word query, it's likely a no-match fallback.
-function looksLikeRealSearch(html) {
-  return /Hai\s+cercato/i.test(html) && /hai\s+trovato\s*<b>\s*\d+/i.test(html.replace(/\*\*/g, "<b>"));
+
+function pickLetter(keyword) {
+  const trimmed = keyword.trim();
+  if (!trimmed) return null;
+  const ch = trimmed.charAt(0).toUpperCase();
+  if (/[A-Z]/.test(ch)) return ch;
+  if (/[0-9]/.test(ch)) return "0-9";
+  return ".";
 }
- 
+
+// Tokens with at least 3 characters, used for multi-word fuzzy matching.
+function significantTokens(keyword) {
+  return keyword
+    .toLowerCase()
+    .split(/[\s\-_:,.!?]+/)
+    .map(t => normalize(t))
+    .filter(t => t.length >= 3);
+}
+
+function fuzzyMatch(title, keyword, tokens) {
+  const nt = normalize(title);
+  const nk = normalize(keyword);
+  if (!nt || !nk) return false;
+  // 1) Whole normalized keyword is a substring of the title (best match).
+  if (nt.includes(nk)) return true;
+  // 2) Multi-word: at least half of the significant tokens must appear.
+  if (tokens.length >= 2) {
+    const hits = tokens.filter(t => nt.includes(t)).length;
+    return hits >= Math.max(2, Math.ceil(tokens.length / 2));
+  }
+  // 3) Single-token: must be a prefix of (or contained in) the title.
+  if (tokens.length === 1) {
+    return nt.includes(tokens[0]);
+  }
+  return false;
+}
+
 // ---- Sora entry points ----
- 
+
 async function searchResults(keyword) {
   try {
-    const response = await soraFetch(`${BASE_URL}/hentailist?search=${encodeURIComponent(keyword)}`);
+    if (!keyword || !keyword.trim()) return JSON.stringify([]);
+
+    const letter = pickLetter(keyword);
+    if (!letter) return JSON.stringify([]);
+
+    const response = await soraFetch(`${BASE_URL}/hentailist?letter=${encodeURIComponent(letter)}`);
     const html = await response.text();
- 
-    let cards = parseAnimeCards(html);
- 
-    // Safety filter: if the page does NOT look like a real search result
-    // (site redirected to a letter page), drop everything.
-    if (!/Hai\s+cercato/i.test(html)) {
-      return JSON.stringify([]);
-    }
- 
-    // Secondary filter: keep only cards whose title fuzzy-matches the keyword.
-    // This protects against the site returning broad matches.
-    const nk = normalize(keyword);
-    if (nk.length >= 3) {
-      const tokens = keyword.toLowerCase().split(/\s+/).map(t => normalize(t)).filter(t => t.length >= 3);
-      const filtered = cards.filter(c => {
-        const nt = normalize(c.title);
-        if (nt.includes(nk)) return true;                     // full keyword present
-        if (tokens.length > 1 && tokens.every(t => nt.includes(t))) return true; // all words present
-        return false;
-      });
-      // If fuzzy filtering wipes everything but the site DID say it found results,
-      // trust the site (different romanization, alt titles, etc.) — return original.
-      if (filtered.length > 0) cards = filtered;
-    }
- 
-    return JSON.stringify(cards);
+    const allCards = parseAnimeCards(html);
+
+    const tokens = significantTokens(keyword);
+    let matched = allCards.filter(c => fuzzyMatch(c.title, keyword, tokens));
+
+    // Final guard: never return random/unfiltered cards. If no fuzzy match,
+    // return empty so Sora knows this source has no match.
+    return JSON.stringify(matched);
   } catch (e) {
     return JSON.stringify([]);
   }
 }
- 
+
 async function extractDetails(url) {
   try {
+    if (!/hentaisaturn\.tv\/hentai\//i.test(url)) {
+      return JSON.stringify([{ description: "URL non valida.", aliases: "", airdate: "" }]);
+    }
+
     const response = await soraFetch(url);
     const html = await response.text();
- 
+
     let description = "";
     const tramaMatch = html.match(/<div id="shown-trama">([\s\S]*?)<\/div>/);
     if (tramaMatch) {
@@ -97,7 +116,7 @@ async function extractDetails(url) {
       const metaMatch = html.match(/<meta\s+name="description"\s+content="([^"]+)"/i);
       if (metaMatch) description = metaMatch[1].trim();
     }
- 
+
     return JSON.stringify([{
       description: description || "Nessuna descrizione disponibile.",
       aliases: "",
@@ -107,17 +126,14 @@ async function extractDetails(url) {
     return JSON.stringify([{ description: "Errore nel caricamento dei dettagli.", aliases: "", airdate: "" }]);
   }
 }
- 
+
 async function extractEpisodes(url) {
   try {
-    // If Sora passed a non-HentaiSaturn URL (e.g. an AniList fallback), bail out cleanly.
-    if (!/hentaisaturn\.tv\/hentai\//i.test(url)) {
-      return JSON.stringify([]);
-    }
- 
+    if (!/hentaisaturn\.tv\/hentai\//i.test(url)) return JSON.stringify([]);
+
     const response = await soraFetch(url);
     const html = await response.text();
- 
+
     const results = [];
     const seen = new Set();
     const episodeRegex = /<a[^>]+href="(https?:\/\/www\.hentaisaturn\.tv\/episode\/[^"]+)"[^>]*>\s*Episodio\s+(\d+)\s*<\/a>/gi;
@@ -133,17 +149,17 @@ async function extractEpisodes(url) {
     return JSON.stringify([]);
   }
 }
- 
+
 function findStreamUrl(html) {
   const patterns = [
-    /file:\s*["'](https?:\/\/[^"']+\.m3u8[^"']*)["']/i,           // jwplayer file:
-    /source:\s*["'](https?:\/\/[^"']+\.m3u8[^"']*)["']/i,         // plyr / other
-    /src:\s*["'](https?:\/\/[^"']+\.m3u8[^"']*)["']/i,            // generic
-    /<source[^>]+src=["'](https?:\/\/[^"'>]+\.m3u8[^"'>]*)["']/i, // <source> hls
-    /(https?:\/\/[^"'\s<>]+\.m3u8[^"'\s<>]*)/i,                   // bare m3u8
-    /file:\s*["'](https?:\/\/[^"']+\.mp4[^"']*)["']/i,            // jwplayer mp4
-    /<source[^>]+src=["'](https?:\/\/[^"'>]+\.mp4[^"'>]*)["']/i, // <source> mp4
-    /(https?:\/\/[^"'\s<>]+\.mp4[^"'\s<>]*)/i                     // bare mp4
+    /file:\s*["'](https?:\/\/[^"']+\.m3u8[^"']*)["']/i,
+    /source:\s*["'](https?:\/\/[^"']+\.m3u8[^"']*)["']/i,
+    /src:\s*["'](https?:\/\/[^"']+\.m3u8[^"']*)["']/i,
+    /<source[^>]+src=["'](https?:\/\/[^"'>]+\.m3u8[^"'>]*)["']/i,
+    /(https?:\/\/[^"'\s<>]+\.m3u8[^"'\s<>]*)/i,
+    /file:\s*["'](https?:\/\/[^"']+\.mp4[^"']*)["']/i,
+    /<source[^>]+src=["'](https?:\/\/[^"'>]+\.mp4[^"'>]*)["']/i,
+    /(https?:\/\/[^"'\s<>]+\.mp4[^"'\s<>]*)/i
   ];
   for (const re of patterns) {
     const m = html.match(re);
@@ -151,23 +167,23 @@ function findStreamUrl(html) {
   }
   return null;
 }
- 
+
 async function extractStreamUrl(url) {
   try {
     if (!/hentaisaturn\.tv\/episode\//i.test(url)) return null;
- 
+
     const epResponse = await soraFetch(url);
     const epHtml = await epResponse.text();
- 
+
     const watchMatch = epHtml.match(/((?:https?:\/\/www\.hentaisaturn\.tv)?\/watch\?file=[^"'\s]+)/);
     if (!watchMatch) return null;
- 
+
     let watchUrl = watchMatch[1].trim();
     if (watchUrl.startsWith("/")) watchUrl = BASE_URL + watchUrl;
- 
+
     const watchResponse = await soraFetch(watchUrl, { headers: { "Referer": url }, method: "GET", body: null });
     const watchHtml = await watchResponse.text();
- 
+
     return findStreamUrl(watchHtml);
   } catch (e) {
     return null;
