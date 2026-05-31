@@ -12,7 +12,7 @@
   "baseUrl": "https://www.hentaisaturn.tv/",
   "searchBaseUrl": "https://www.hentaisaturn.tv/hentailist?search=%s",
   "scriptUrl": "https://raw.githubusercontent.com/ManuGalzerk/Strunity/refs/heads/main/an1mh.js",
-  "type": "hanime",
+  "type": "anime",
   "asyncJS": true,
   "supportsMojuru": true,
   "supportsDartotsu": true,
