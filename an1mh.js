@@ -1,6 +1,9 @@
+mh · JS
 // HentaiSaturn - Sora module (asyncJS: true)
-// Entry points: searchResults, extractDetails, extractEpisodes, extractStreamUrl
-// extractStreamUrl returns a PLAIN URL STRING (or null).
+// Mirrors the AnimeSaturn module structure (same codebase, same markup conventions).
+// The only meaningful difference is the watch page: HentaiSaturn's primary player
+// loads the video via JavaScript so the stream URL isn't in the HTML — we use the
+// alternative player (&s=alt) which exposes the direct URL in plain HTML.
  
 const BASE_URL = "https://www.hentaisaturn.tv";
  
@@ -16,9 +19,11 @@ async function soraFetch(url, options = { headers: {}, method: "GET", body: null
   }
 }
  
-// HentaiSaturn card markup: any <a href=".../hentai/..."> containing an
-// <img src=".../locandine/..." alt="...">. Class names vary, so don't hard-code them.
-const CARD_REGEX = /<a[^>]+href="(https?:\/\/www\.hentaisaturn\.tv\/hentai\/[^"]+)"[^>]*>[\s\S]*?<img[^>]+src="(https?:\/\/cdn\.hentaisaturn\.tv\/static\/images\/locandine\/[^"]+)"[^>]*\balt="([^"]+)"/g;
+// Strict card regex matching the same structure as the working AnimeSaturn module:
+// <a href=".../hentai/..." class="thumb image-wrapper">
+//   <img src=".../locandine/..." alt="Title">
+// This class only appears on actual result cards, so fallback/archive pages won't match.
+const CARD_REGEX = /<a href="(https:\/\/www\.hentaisaturn\.tv\/hentai\/[^"]+)"[^>]*class="thumb image-wrapper">\s*<img src="(https:\/\/cdn\.hentaisaturn\.tv\/static\/images\/locandine\/[^"]+)"[^>]*alt="([^"]+)"/g;
  
 function parseAnimeCards(html) {
   const results = [];
@@ -50,20 +55,9 @@ async function extractDetails(url) {
   try {
     const response = await soraFetch(url);
     const html = await response.text();
- 
-    // Prefer the in-page "trama" block; fall back to the <meta description>.
-    let description = "";
-    const tramaMatch = html.match(/<div id="shown-trama">([\s\S]*?)<\/div>/);
-    if (tramaMatch) {
-      description = tramaMatch[1].replace(/<[^>]+>/g, "").trim();
-    }
-    if (!description) {
-      const metaMatch = html.match(/<meta\s+name="description"\s+content="([^"]+)"/i);
-      if (metaMatch) description = metaMatch[1].trim();
-    }
- 
+    const descriptionMatch = html.match(/<div id="shown-trama">([^<]+)<\/div>/);
     return JSON.stringify([{
-      description: description || "Nessuna descrizione disponibile.",
+      description: descriptionMatch ? descriptionMatch[1].trim() : "Nessuna descrizione disponibile.",
       aliases: "",
       airdate: ""
     }]);
@@ -76,17 +70,12 @@ async function extractEpisodes(url) {
   try {
     const response = await soraFetch(url);
     const html = await response.text();
- 
     const results = [];
-    const seen = new Set();
-    // Match any anchor pointing to /episode/... whose link text is "Episodio N".
-    const episodeRegex = /<a[^>]+href="(https?:\/\/www\.hentaisaturn\.tv\/episode\/[^"]+)"[^>]*>\s*Episodio\s+(\d+)\s*<\/a>/gi;
+    // Episode URL pattern on HentaiSaturn is /episode/ (vs /ep/ on AnimeSaturn)
+    const episodeRegex = /<a\s+href="(https:\/\/www\.hentaisaturn\.tv\/episode\/[^"]+)"\s*target="_blank"\s*class="btn btn-dark mb-1 bottone-ep">\s*Episodio\s+(\d+)\s*<\/a>/gs;
     let match;
     while ((match = episodeRegex.exec(html)) !== null) {
-      const href = match[1].trim();
-      if (seen.has(href)) continue;
-      seen.add(href);
-      results.push({ href: href, number: parseInt(match[2], 10) });
+      results.push({ href: match[1].trim(), number: parseInt(match[2], 10) });
     }
     return JSON.stringify(results);
   } catch (e) {
@@ -94,13 +83,17 @@ async function extractEpisodes(url) {
   }
 }
  
+// Pull a playable URL out of the watch-page HTML.
+// On the &s=alt player it's a plain <a href="...mp4">; on JS players it's various inline patterns.
 function findStreamUrl(html) {
   const patterns = [
-    /file:\s*["'](https?:\/\/[^"']+\.m3u8[^"']*)["']/i,
+    /<a[^>]+href=["'](https?:\/\/[^"'<>]+\.mp4[^"'<>]*)["']/i,    // anchor in &s=alt page
+    /<a[^>]+href=["'](https?:\/\/[^"'<>]+\.m3u8[^"'<>]*)["']/i,
+    /file:\s*["'](https?:\/\/[^"']+\.m3u8[^"']*)["']/i,            // jwplayer hls
     /<source[^>]+src=["'](https?:\/\/[^"'>]+\.m3u8[^"'>]*)["']/i,
-    /(https?:\/\/[^"'\s]+\.m3u8[^"'\s]*)/i,
+    /(https?:\/\/[^"'\s<>]+\.m3u8[^"'\s<>]*)/i,                    // bare m3u8
     /<source[^>]+src=["'](https?:\/\/[^"'>]+\.mp4[^"'>]*)["']/i,
-    /(https?:\/\/[^"'\s]+\.mp4[^"'\s]*)/i
+    /(https?:\/\/[^"'\s<>]+\.mp4[^"'\s<>]*)/i                      // bare mp4
   ];
   for (const re of patterns) {
     const m = html.match(re);
@@ -111,20 +104,37 @@ function findStreamUrl(html) {
  
 async function extractStreamUrl(url) {
   try {
+    // url = episode page. Find the "Guarda lo streaming" watch link.
     const epResponse = await soraFetch(url);
     const epHtml = await epResponse.text();
  
-    const watchMatch = epHtml.match(/((?:https?:\/\/www\.hentaisaturn\.tv)?\/watch\?file=[^"'\s]+)/);
+    const watchMatch = epHtml.match(/((?:https:\/\/www\.hentaisaturn\.tv)?\/watch\?file=[^"'\s]+)/);
     if (!watchMatch) return null;
  
     let watchUrl = watchMatch[1].trim();
     if (watchUrl.startsWith("/")) watchUrl = BASE_URL + watchUrl;
  
-    const watchResponse = await soraFetch(watchUrl, { headers: { "Referer": url }, method: "GET", body: null });
-    const watchHtml = await watchResponse.text();
+    // Primary player loads via JS — switch to the alt player which exposes
+    // the direct URL as a plain <a href="...mp4"> in the HTML.
+    const altUrl = watchUrl + (watchUrl.includes("?") ? "&s=alt" : "?s=alt");
  
-    return findStreamUrl(watchHtml);
+    const altResponse = await soraFetch(altUrl, { headers: { "Referer": url }, method: "GET", body: null });
+    if (altResponse) {
+      const altHtml = await altResponse.text();
+      const altStream = findStreamUrl(altHtml);
+      if (altStream) return altStream;
+    }
+ 
+    // Fallback to primary player in case alt isn't available for some episodes.
+    const primResponse = await soraFetch(watchUrl, { headers: { "Referer": url }, method: "GET", body: null });
+    if (primResponse) {
+      const primHtml = await primResponse.text();
+      return findStreamUrl(primHtml);
+    }
+ 
+    return null;
   } catch (e) {
     return null;
   }
 }
+ 
