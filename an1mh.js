@@ -1,9 +1,11 @@
 // HentaiSaturn - Sora module (asyncJS: true)
 // Entry points: searchResults, extractDetails, extractEpisodes, extractStreamUrl
-// extractStreamUrl returns a PLAIN URL STRING (or null).
- 
+// NOTE: extractStreamUrl returns a PLAIN URL STRING (or null) — the app parses it
+// as a stream URL, NOT as JSON. Returning an object/array causes "could not parse".
+
 const BASE_URL = "https://www.hentaisaturn.tv";
- 
+
+// Proven fetch helper (same signature as the working modules in this repo)
 async function soraFetch(url, options = { headers: {}, method: "GET", body: null }) {
   try {
     return await fetchv2(url, options.headers ?? {}, options.method ?? "GET", options.body ?? null);
@@ -15,17 +17,15 @@ async function soraFetch(url, options = { headers: {}, method: "GET", body: null
     }
   }
 }
- 
-// HentaiSaturn card markup: any <a href=".../hentai/..."> containing an
-// <img src=".../locandine/..." alt="...">. Class names vary, so don't hard-code them.
-const CARD_REGEX = /<a[^>]+href="(https?:\/\/www\.hentaisaturn\.tv\/hentai\/[^"]+)"[^>]*>[\s\S]*?<img[^>]+src="(https?:\/\/cdn\.hentaisaturn\.tv\/static\/images\/locandine\/[^"]+)"[^>]*\balt="([^"]+)"/g;
- 
+
+const ANIME_CARD_REGEX = /<a href="(https:\/\/www\.hentaisaturn\.tv\/hentai\/[^"]+)"[^>]*class="thumb image-wrapper">\s*<img src="(https:\/\/cdn\.hentaisaturn\.cx\/static\/images\/locandine\/[^"]+)"[^>]*alt="([^"]+)"/g;
+
 function parseAnimeCards(html) {
   const results = [];
   const seen = new Set();
   let match;
-  CARD_REGEX.lastIndex = 0;
-  while ((match = CARD_REGEX.exec(html)) !== null) {
+  ANIME_CARD_REGEX.lastIndex = 0;
+  while ((match = ANIME_CARD_REGEX.exec(html)) !== null) {
     const href = match[1].trim();
     if (seen.has(href)) continue;
     seen.add(href);
@@ -33,9 +33,9 @@ function parseAnimeCards(html) {
   }
   return results;
 }
- 
+
 // ---- Sora entry points ----
- 
+
 async function searchResults(keyword) {
   try {
     const response = await soraFetch(`${BASE_URL}/hentailist?search=${encodeURIComponent(keyword)}`);
@@ -45,25 +45,14 @@ async function searchResults(keyword) {
     return JSON.stringify([]);
   }
 }
- 
+
 async function extractDetails(url) {
   try {
     const response = await soraFetch(url);
     const html = await response.text();
- 
-    // Prefer the in-page "trama" block; fall back to the <meta description>.
-    let description = "";
-    const tramaMatch = html.match(/<div id="shown-trama">([\s\S]*?)<\/div>/);
-    if (tramaMatch) {
-      description = tramaMatch[1].replace(/<[^>]+>/g, "").trim();
-    }
-    if (!description) {
-      const metaMatch = html.match(/<meta\s+name="description"\s+content="([^"]+)"/i);
-      if (metaMatch) description = metaMatch[1].trim();
-    }
- 
+    const descriptionMatch = html.match(/<div id="shown-trama">([^<]+)<\/div>/);
     return JSON.stringify([{
-      description: description || "Nessuna descrizione disponibile.",
+      description: descriptionMatch ? descriptionMatch[1].trim() : "Nessuna descrizione disponibile.",
       aliases: "",
       airdate: ""
     }]);
@@ -71,36 +60,31 @@ async function extractDetails(url) {
     return JSON.stringify([{ description: "Errore nel caricamento dei dettagli.", aliases: "", airdate: "" }]);
   }
 }
- 
+
 async function extractEpisodes(url) {
   try {
     const response = await soraFetch(url);
     const html = await response.text();
- 
     const results = [];
-    const seen = new Set();
-    // Match any anchor pointing to /episode/... whose link text is "Episodio N".
-    const episodeRegex = /<a[^>]+href="(https?:\/\/www\.hentaisaturn\.tv\/episode\/[^"]+)"[^>]*>\s*Episodio\s+(\d+)\s*<\/a>/gi;
+    const episodeRegex = /<a\s+href="(https:\/\/www\.hentaisaturn\.tv\/episode\/[^"]+)"\s*target="_blank"\s*class="btn btn-dark mb-1 bottone-ep">\s*Episodio\s+(\d+)\s*<\/a>/gs;
     let match;
     while ((match = episodeRegex.exec(html)) !== null) {
-      const href = match[1].trim();
-      if (seen.has(href)) continue;
-      seen.add(href);
-      results.push({ href: href, number: parseInt(match[2], 10) });
+      results.push({ href: match[1].trim(), number: parseInt(match[2], 10) });
     }
     return JSON.stringify(results);
   } catch (e) {
     return JSON.stringify([]);
   }
 }
- 
+
+// Pull a playable URL out of the watch-page HTML (m3u8 preferred, then mp4)
 function findStreamUrl(html) {
   const patterns = [
-    /file:\s*["'](https?:\/\/[^"']+\.m3u8[^"']*)["']/i,
-    /<source[^>]+src=["'](https?:\/\/[^"'>]+\.m3u8[^"'>]*)["']/i,
-    /(https?:\/\/[^"'\s]+\.m3u8[^"'\s]*)/i,
-    /<source[^>]+src=["'](https?:\/\/[^"'>]+\.mp4[^"'>]*)["']/i,
-    /(https?:\/\/[^"'\s]+\.mp4[^"'\s]*)/i
+    /file:\s*["'](https?:\/\/[^"']+\.m3u8[^"']*)["']/i,            // jwplayer file:
+    /<source[^>]+src=["'](https?:\/\/[^"'>]+\.m3u8[^"'>]*)["']/i, // <source> hls
+    /(https?:\/\/[^"'\s]+\.m3u8[^"'\s]*)/i,                        // bare m3u8
+    /<source[^>]+src=["'](https?:\/\/[^"'>]+\.mp4[^"'>]*)["']/i,  // <source> mp4
+    /(https?:\/\/[^"'\s]+\.mp4[^"'\s]*)/i                          // bare mp4
   ];
   for (const re of patterns) {
     const m = html.match(re);
@@ -108,22 +92,24 @@ function findStreamUrl(html) {
   }
   return null;
 }
- 
+
 async function extractStreamUrl(url) {
   try {
+    // url = episode page (/ep/...). Find the "Guarda lo streaming" watch link.
     const epResponse = await soraFetch(url);
     const epHtml = await epResponse.text();
- 
-    const watchMatch = epHtml.match(/((?:https?:\/\/www\.hentaisaturn\.tv)?\/watch\?file=[^"'\s]+)/);
+
+    const watchMatch = epHtml.match(/((?:https:\/\/www\.hentaisaturn\.tv)?\/watch\?file=[^"'\s]+)/);
     if (!watchMatch) return null;
- 
+
     let watchUrl = watchMatch[1].trim();
     if (watchUrl.startsWith("/")) watchUrl = BASE_URL + watchUrl;
- 
+
+    // Watch page often needs the episode page as Referer
     const watchResponse = await soraFetch(watchUrl, { headers: { "Referer": url }, method: "GET", body: null });
     const watchHtml = await watchResponse.text();
- 
-    return findStreamUrl(watchHtml);
+
+    return findStreamUrl(watchHtml); // plain string URL, or null
   } catch (e) {
     return null;
   }
