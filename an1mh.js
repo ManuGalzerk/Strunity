@@ -1,4 +1,4 @@
-/ HentaiSaturn - Sora module (asyncJS: true)
+// HentaiSaturn - Sora module (asyncJS: true)
 // Entry points: searchResults, extractDetails, extractEpisodes, extractStreamUrl
 // NOTE: extractStreamUrl returns a PLAIN URL STRING (or null) â€” the app parses it
 // as a stream URL, NOT as JSON. Returning an object/array causes "could not parse".
