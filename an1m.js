@@ -18,7 +18,7 @@ async function soraFetch(url, options = { headers: {}, method: "GET", body: null
   }
 }
 
-const ANIME_CARD_REGEX = /<a href="(https:\/\/www\.animesaturn\.cx\/anime\/[^"]+)"[^>]*class="thumb image-wrapper">\s*<img src="(https:\/\/cdn\.animesaturn\.cx\/static\/images\/copertine\/[^"]+)"[^>]*alt="([^"]+)"/g;
+const ANIME_CARD_REGEX = /<a href="(https:\/\/www\.animesaturn\.cx\/anime\/[^"]+)"[^>]*class="thumb image-wrapper">\s*<img src="(https:\/\/cdn\.animesaturn\.cx\/static\/images\/locandine\/[^"]+)"[^>]*alt="([^"]+)"/g;
 
 function parseAnimeCards(html) {
   const results = [];
