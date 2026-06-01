@@ -40,11 +40,13 @@ async function searchResults(keyword) {
   try {
     const response = await soraFetch(`${BASE_URL}/animelist?search=${encodeURIComponent(keyword)}`);
     const html = await response.text();
-    return JSON.stringify(parseAnimeCards(html));
+    // DEBUG: vedi se arriva HTML e quanto è lungo
+    return JSON.stringify([{ title: "DEBUG len=" + html.length, image: "", href: BASE_URL }]);
   } catch (e) {
-    return JSON.stringify([]);
+    return JSON.stringify([{ title: "ERRORE: " + e.message, image: "", href: BASE_URL }]);
   }
 }
+
 
 async function extractDetails(url) {
   try {
