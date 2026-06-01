@@ -18,7 +18,11 @@ async function soraFetch(url, options = { headers: {}, method: "GET", body: null
   }
 }
 
-const ANIME_CARD_REGEX = /<a href="(https:\/\/www\.animesaturn\.cx\/anime\/[^"]+)"[^>]*class="thumb image-wrapper">\s*<img src="(https:\/\/cdn\.animesaturn\.cx\/static\/images\/copertine\/[^"]+)"[^>]*alt="([^"]+)"/g;
+// FIX: uso new RegExp() per evitare problemi di parsing del literal nel JS engine di Shirox
+const ANIME_CARD_REGEX = new RegExp(
+  '<a href="(https://www\\.animesaturn\\.cx/anime/[^"]+)"[^>]*class="thumb image-wrapper">\\s*<img src="(https://cdn\\.animesaturn\\.cx/static/images/copertine/[^"]+)"[^>]*alt="([^"]+)"',
+  'g'
+);
 
 function parseAnimeCards(html) {
   const results = [];
