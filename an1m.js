@@ -23,16 +23,38 @@ const ANIME_CARD_REGEX = /<a href="(https:\/\/www\.animesaturn\.cx\/anime\/[^"]+
 function parseAnimeCards(html) {
   const results = [];
   const seen = new Set();
+
+  // Cattura ogni <a ...href=".../anime/..."> ... </a> in modo lasco
+  const linkRegex = /<a\s+[^>]*?href="((?:https?:\/\/[^"]*?animesaturn[^"]*?)?\/anime\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+
   let match;
-  ANIME_CARD_REGEX.lastIndex = 0;
-  while ((match = ANIME_CARD_REGEX.exec(html)) !== null) {
-    const href = match[1].trim();
+  while ((match = linkRegex.exec(html)) !== null) {
+    let href = match[1].trim();
+    if (href.startsWith("/")) href = BASE_URL + href;
     if (seen.has(href)) continue;
     seen.add(href);
-    results.push({ title: match[3].trim(), image: match[2].trim(), href: href });
+
+    const inner = match[2];
+
+    // src oppure data-src (lazy-load), in qualsiasi ordine
+    const imgMatch = inner.match(/<img[^>]*?(?:data-src|data-original|src)="([^"]+)"/i);
+    let image = imgMatch ? imgMatch[1].trim() : "";
+    if (image.startsWith("/")) image = BASE_URL + image;
+
+    // titolo: prima da alt, altrimenti dal title, altrimenti dal testo
+    const altMatch = inner.match(/alt="([^"]+)"/i);
+    const titleAttr = inner.match(/title="([^"]+)"/i);
+    let title = altMatch ? altMatch[1] : (titleAttr ? titleAttr[1] : "");
+    if (!title) {
+      const textMatch = inner.replace(/<[^>]+>/g, " ").trim();
+      if (textMatch) title = textMatch;
+    }
+
+    if (title) results.push({ title: title.trim(), image, href });
   }
   return results;
 }
+
 
 // ---- Sora entry points ----
 
