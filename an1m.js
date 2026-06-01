@@ -62,12 +62,22 @@ async function searchResults(keyword) {
   try {
     const response = await soraFetch(`${BASE_URL}/animelist?search=${encodeURIComponent(keyword)}`);
     const html = await response.text();
-    // DEBUG: vedi se arriva HTML e quanto è lungo
-    return JSON.stringify([{ title: "DEBUG len=" + html.length, image: "", href: BASE_URL }]);
+
+    // Trova il primo "/anime/" e mostra un pezzo di HTML attorno
+    const idx = html.indexOf("/anime/");
+    let snippet;
+    if (idx === -1) {
+      snippet = "NESSUN /anime/ TROVATO nell'HTML";
+    } else {
+      snippet = html.substring(Math.max(0, idx - 200), idx + 300);
+    }
+
+    return JSON.stringify([{ title: snippet, image: "", href: BASE_URL }]);
   } catch (e) {
     return JSON.stringify([{ title: "ERRORE: " + e.message, image: "", href: BASE_URL }]);
   }
 }
+
 
 
 async function extractDetails(url) {
